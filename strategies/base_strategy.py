@@ -103,10 +103,13 @@ class BaseStrategy(Strategy):
         Returns:
             dict | None: 仓位信息字典，如果无仓位返回 None
         """
-        position = self.cache.position(self.instrument_id)
+        # positions_open 返回列表，取第一个（应该只有一个）
+        positions = self.cache.positions_open(instrument_id=self.instrument_id)
 
-        if not position:
+        if not positions:
             return None
+
+        position = positions[0]
 
         return {
             'side': str(position.side),  # 'LONG' | 'SHORT' | 'FLAT'
