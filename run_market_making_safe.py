@@ -126,7 +126,7 @@ def main():
         from nautilus_trader.config import InstrumentProviderConfig
         from nautilus_trader.config import LoggingConfig, TradingNodeConfig, StrategyConfig
         from nautilus_trader.live.node import TradingNode
-        from nautilus_trader.model.identifiers import TraderId, Venue
+        from nautilus_trader.model.identifiers import TraderId, Venue, InstrumentId
         from nautilus_trader.portfolio.config import PortfolioConfig
         from strategies.market_making_strategy import MarketMakingStrategy
     except ImportError as e:
@@ -140,7 +140,7 @@ def main():
 
     # 创建策略配置
     class MarketMakingSafeConfig(StrategyConfig, frozen=True):
-        instrument_id: str
+        instrument_id: InstrumentId
         base_spread: Decimal
         min_spread: Decimal
         max_spread: Decimal
@@ -165,7 +165,7 @@ def main():
 
     # 小资金安全配置（5-10 USDC）
     config = MarketMakingSafeConfig(
-        instrument_id=str(instrument_id),
+        instrument_id=instrument_id,
         base_spread=Decimal("0.05"),      # 5% 价差（提高利润率）
         min_spread=Decimal("0.03"),      # 3% 最小价差
         max_spread=Decimal("0.20"),      # 20% 最大价差
