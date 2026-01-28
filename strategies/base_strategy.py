@@ -98,12 +98,12 @@ class BaseStrategy(Strategy):
         """
         获取当前仓位信息
 
-        [OK] 使用 Portfolio 系统，不自己维护 paper_position
+        [OK] 使用 Cache，不自己维护 paper_position
 
         Returns:
             dict | None: 仓位信息字典，如果无仓位返回 None
         """
-        position = self.portfolio.position(self.instrument_id)
+        position = self.cache.position(self.instrument_id)
 
         if not position:
             return None
