@@ -24,7 +24,13 @@ sys.path.insert(0, str(project_root))
 
 
 def load_env():
-    """加载 .env 文件到环境变量"""
+    """加载私钥 - 优先使用环境变量（Zeabur）"""
+    # 1. 优先从环境变量读取（Zeabur）
+    private_key = os.getenv("POLYMARKET_PK")
+    if private_key:
+        return private_key
+
+    # 2. 尝试从 .env 文件读取（本地开发）
     env_file = project_root / ".env"
     if env_file.exists():
         with open(env_file, 'r', encoding='utf-8') as f:
@@ -32,8 +38,10 @@ def load_env():
                 line = line.strip()
                 if line and not line.startswith('#') and '=' in line:
                     key, value = line.split('=', 1)
-                    os.environ[key.strip()] = value.strip()
-    return os.getenv("POLYMARKET_PK")
+                    if key.strip() == "POLYMARKET_PK":
+                        return value.strip()
+
+    return None
 
 
 def get_market_info(slug: str):
