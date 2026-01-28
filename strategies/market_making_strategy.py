@@ -71,6 +71,9 @@ class MarketMakingStrategy(BaseStrategy):
     def __init__(self, config):
         super().__init__(config)
 
+        # 必需：instrument_id（BaseStrategy.on_start 需要）
+        self.instrument_id = getattr(config, 'instrument_id')
+
         # 从配置读取参数，使用默认值
         self.base_spread = getattr(config, 'base_spread', self.DEFAULT_BASE_SPREAD)
         self.min_spread = getattr(config, 'min_spread', self.DEFAULT_MIN_SPREAD)
