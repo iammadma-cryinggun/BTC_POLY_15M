@@ -16,6 +16,8 @@ COPY . .
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
 
 # 启动15分钟市场策略（基于论文优化）
-CMD ["python", "run_15m_market.py"]
+# 重定向 stdout 和 stderr 到日志文件
+CMD ["sh", "-c", "python run_15m_market.py 2>&1 | tee /dev/stderr"]
