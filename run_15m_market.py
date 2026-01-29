@@ -123,8 +123,8 @@ def get_market_info(slug: str):
 
 
 def get_latest_15m_btc_market():
-    """使用 Gamma API 的 events 端点查找最新的 15分钟 BTC 市场"""
-    from datetime import datetime, timezone
+    """使用时间差逻辑查找最新的 15分钟 BTC 市场"""
+    from datetime import datetime, timezone, timedelta
     import dateutil.parser
 
     try:
@@ -133,11 +133,12 @@ def get_latest_15m_btc_market():
         params = {
             "closed": "false",      # 只看活跃市场
             "tags": "Bitcoin",      # 标签过滤
-            "limit": 20,            # 获取最近的市场
+            "limit": 50,            # 扩大搜索范围
             "order": "endDate:asc"  # 按结束时间升序排列
         }
 
         print(f"[INFO] 查询 Gamma API events...")
+
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         events = response.json()
@@ -147,52 +148,75 @@ def get_latest_15m_btc_market():
 
         print(f"[OK] 找到 {len(events)} 个活跃 BTC 市场，正在筛选...")
 
-        # 遍历找到 15分钟 BTC 市场
-        now = datetime.now(timezone.utc)
+        # 定义时间窗口 (5分钟后 到 25分钟内)
+        MIN_SECONDS = 300   # 5 分钟
+        MAX_SECONDS = 1500  # 25 分钟
 
+        now = datetime.now(timezone.utc)
+        candidates = []
+
+        # 遍历所有市场
         for event in events:
             title = event.get('title', '')
             end_date_str = event.get('endDate')
 
-            # 解析结束时间
+            if not end_date_str:
+                continue
+
             end_date = dateutil.parser.isoparse(end_date_str)
 
-            # 过滤：标题包含 "Bitcoin Up or Down"
-            if "Bitcoin Up or Down" not in title:
-                continue
+            # 计算时间差 (秒)
+            time_diff = (end_date - now).total_seconds()
 
-            # 检查市场是否在未来（未过期）
-            if end_date <= now:
-                print(f"[INFO] 跳过已过期市场: {title}")
-                continue
+            # Debug: 打印前几个市场的时间
+            if len(candidates) < 5 and time_diff > 0:
+                print(f"  [DEBUG] {title[:60]} | 剩余: {int(time_diff/60)}min")
 
-            # 获取市场详情
-            markets = event.get('markets', [])
-            if not markets:
-                continue
+            # 核心筛选：时间在 5-25 分钟窗口内
+            if "Bitcoin" in title and MIN_SECONDS < time_diff < MAX_SECONDS:
+                candidates.append({
+                    "title": title,
+                    "diff": time_diff,
+                    "event": event
+                })
 
-            market = markets[0]
-            condition_id = market.get('conditionId')
-            clob_token_ids_str = market.get('clobTokenIds', '[]')
-            token_ids = json.loads(clob_token_ids_str)
+        if not candidates:
+            # 打印最近的市场信息，方便调试
+            if len(events) > 0:
+                first_event = events[0]
+                first_end = dateutil.parser.isoparse(first_event.get('endDate'))
+                diff = (first_end - now).total_seconds()
+                print(f"[DEBUG] 最近的 BTC 市场: {first_event.get('title')[:60]}")
+                print(f"[DEBUG] 距结束: {int(diff/60)} 分钟")
 
-            if not all([condition_id, token_ids]):
-                continue
+            raise ValueError(f"未找到符合时间窗口 (5-25分钟) 的 BTC 市场")
 
-            # 获取 slug（从 markets 数组的第一个元素）
-            slug = market.get('slug', '')
+        # 选择最佳市场（列表第一个是最早结束的）
+        best_match = candidates[0]
 
-            print(f"\n[OK] ✅ 找到目标市场!")
-            print(f"[INFO] 标题: {title}")
-            print(f"[INFO] 结束时间 (UTC): {end_date}")
-            print(f"[INFO] URL: https://polymarket.com/event/{slug}")
-            print(f"[DEBUG] Condition ID: {condition_id}")
-            print(f"[DEBUG] Token IDs: {token_ids}")
+        print(f"\n[OK] ✅ 锁定市场!")
+        print(f"[INFO] 标题: {best_match['title']}")
+        print(f"[INFO] 剩余时间: {int(best_match['diff']/60)} 分钟")
 
-            return condition_id, token_ids[0], title, slug
+        # 提取市场信息
+        markets = best_match['event'].get('markets', [])
+        if not markets:
+            raise ValueError("Event 中没有市场数据")
 
-        # 如果遍历完都没找到
-        raise ValueError("未找到符合条件的 15分钟 BTC 市场")
+        market = markets[0]
+        condition_id = market.get('conditionId')
+        clob_token_ids_str = market.get('clobTokenIds', '[]')
+        token_ids = json.loads(clob_token_ids_str)
+        slug = market.get('slug', '')
+
+        if not all([condition_id, token_ids]):
+            raise ValueError("市场信息不完整")
+
+        print(f"[INFO] URL: https://polymarket.com/event/{slug}")
+        print(f"[DEBUG] Condition ID: {condition_id}")
+        print(f"[DEBUG] Token ID: {token_ids[0]}")
+
+        return condition_id, token_ids[0], best_match['title'], slug
 
     except Exception as e:
         print(f"[WARN] 查询失败: {str(e)[:80]}")
