@@ -225,11 +225,7 @@ def main():
         instrument_id = get_polymarket_instrument_id(condition_id, token_id)
         print(f"[OK] Instrument ID: {instrument_id}")
         print(f"[DEBUG] Instrument ID 类型: {type(instrument_id)}")
-
-        # 准备 load_ids（确保是字符串的 frozenset）
-        load_ids = frozenset([str(instrument_id)])
-        print(f"[DEBUG] load_ids: {load_ids}")
-        print(f"[DEBUG] load_ids 类型: {type(load_ids)}")
+        print(f"[DEBUG] Instrument ID (字符串): {str(instrument_id)}")
 
         # 创建基于论文优化的预测市场做市策略配置
         class PredictionMarketConfig(StrategyConfig, frozen=True):
@@ -286,9 +282,9 @@ def main():
                 POLYMARKET: PolymarketDataClientConfig(
                     private_key=private_key,
                     signature_type=2,  # Magic Wallet
+                    # 直接内联创建 load_ids，避免变量作用域问题
                     instrument_provider=InstrumentProviderConfig(
-                        load_all=True,  # 加载所有市场（虽然慢但至少能工作）
-                        log_warnings=False,  # 关闭警告减少日志
+                        load_ids=frozenset([str(instrument_id)])
                     ),
                 ),
             },
