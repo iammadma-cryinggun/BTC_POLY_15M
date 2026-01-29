@@ -125,11 +125,11 @@ def get_market_info(slug: str):
 def get_latest_15m_btc_market():
     """自动查找最新的15分钟BTC市场"""
     try:
-        # 直接使用你提供的 slug 格式搜索
+        # 搜索标题包含 "Bitcoin Up or Down" 的市场
         url = "https://gamma-api.polymarket.com/markets"
         params = {
-            "query": "btc updown",  # 搜索 BTC 涨跌市场
-            "limit": 100,
+            "query": "Bitcoin Up or Down",  # 精确匹配前端标题
+            "limit": 50,
             "closing_status": "open",
         }
 
@@ -141,28 +141,19 @@ def get_latest_15m_btc_market():
         if not markets:
             raise ValueError("未找到BTC市场")
 
-        # 过滤：slug 必须包含 "btc-updown-15m" 格式
+        # 过滤：question 必须包含 "Bitcoin Up or Down"
         filtered_markets = []
         for m in markets:
-            slug = m.get('slug', '').lower()
-            question = m.get('question', '').lower()
-            # 只选择 slug 包含 "btc-updown-15m" 的市场
-            if 'btc-updown-15m-' in slug:
+            question = m.get('question', '')
+            # 精确匹配前端标题
+            if 'Bitcoin Up or Down' in question:
                 filtered_markets.append(m)
 
         if not filtered_markets:
-            print(f"[WARN] 搜索到 {len(markets)} 个市场，但没有找到 btc-updown-15m 格式的市场")
-            print(f"[DEBUG] 显示包含 'btc' 的市场:")
-            count = 0
-            for m in markets:
-                slug = m.get('slug', '').lower()
-                question = m.get('question', '')
-                if 'btc' in slug:
-                    count += 1
-                    print(f"  {count}. {slug}")
-                    print(f"     Question: {question[:60]}...")
-                    if count >= 5:
-                        break
+            print(f"[WARN] 搜索到 {len(markets)} 个市场，但没有找到 'Bitcoin Up or Down' 市场")
+            print(f"[DEBUG] 显示前5个市场:")
+            for i, m in enumerate(markets[:5]):
+                print(f"  {i+1}. {m.get('question', 'N/A')[:80]}...")
             raise ValueError("未找到符合条件的15分钟BTC市场")
 
         # 按开始时间排序，取最新的
