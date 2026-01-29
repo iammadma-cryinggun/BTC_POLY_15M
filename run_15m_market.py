@@ -123,45 +123,81 @@ def get_market_info(slug: str):
 
 
 def get_latest_15m_btc_market():
-    """自动查找最新的15分钟BTC市场"""
-    import time
+    """使用 Gamma API 的 events 端点查找最新的 15分钟 BTC 市场"""
+    from datetime import datetime, timezone
+    import dateutil.parser
+
     try:
-        # 根据当前时间计算 15分钟市场的时间戳
-        # Polymarket 使用美东时间 (ET)，UTC-5 (或 UTC-4 夏令时)
-        # 15分钟市场从 9:30 AM ET 开始，每15分钟一轮
-        current_time = int(time.time())
+        # 使用 Gamma API 的 events 端点
+        url = "https://gamma-api.polymarket.com/events"
+        params = {
+            "closed": "false",      # 只看活跃市场
+            "tags": "Bitcoin",      # 标签过滤
+            "limit": 20,            # 获取最近的市场
+            "order": "endDate:asc"  # 按结束时间升序排列
+        }
 
-        # 尝试当前和之前的几个 15分钟时间窗口
-        # 每个 15分钟 = 900 秒
-        attempts = []
-        for offset in range(0, 4):  # 尝试最近4个时间窗口
-            # 向下取整到最近的15分钟
-            timestamp = ((current_time - offset * 900) // 900) * 900
-            attempts.append(timestamp)
+        print(f"[INFO] 查询 Gamma API events...")
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        events = response.json()
 
-        print(f"[INFO] 尝试以下时间戳（按新到旧）: {attempts}")
+        if not events:
+            raise ValueError("未找到活跃的 BTC 市场")
 
-        for timestamp in attempts:
-            slug = f"btc-updown-15m-{timestamp}"
-            print(f"[INFO] 尝试获取市场: {slug}")
+        print(f"[OK] 找到 {len(events)} 个活跃 BTC 市场，正在筛选...")
 
-            market_info = get_market_info(slug)
-            if market_info:
-                condition_id, token_id, question = market_info
-                print(f"[OK] 成功找到市场!")
-                print(f"[INFO] URL: https://polymarket.com/event/{slug}")
-                print(f"[INFO] Question: {question[:80]}...")
-                return condition_id, token_id, question, slug
+        # 遍历找到 15分钟 BTC 市场
+        now = datetime.now(timezone.utc)
 
-        # 所有尝试都失败
-        print(f"[ERROR] 尝试了 {len(attempts)} 个时间窗口，都未找到有效市场")
-        print(f"[INFO] 最后尝试的时间戳: {attempts[-1]}")
-        raise ValueError("未找到符合条件的15分钟BTC市场")
+        for event in events:
+            title = event.get('title', '')
+            end_date_str = event.get('endDate')
+
+            # 解析结束时间
+            end_date = dateutil.parser.isoparse(end_date_str)
+
+            # 过滤：标题包含 "Bitcoin Up or Down"
+            if "Bitcoin Up or Down" not in title:
+                continue
+
+            # 检查市场是否在未来（未过期）
+            if end_date <= now:
+                print(f"[INFO] 跳过已过期市场: {title}")
+                continue
+
+            # 获取市场详情
+            markets = event.get('markets', [])
+            if not markets:
+                continue
+
+            market = markets[0]
+            condition_id = market.get('conditionId')
+            clob_token_ids_str = market.get('clobTokenIds', '[]')
+            token_ids = json.loads(clob_token_ids_str)
+
+            if not all([condition_id, token_ids]):
+                continue
+
+            # 获取 slug（从 markets 数组的第一个元素）
+            slug = market.get('slug', '')
+
+            print(f"\n[OK] ✅ 找到目标市场!")
+            print(f"[INFO] 标题: {title}")
+            print(f"[INFO] 结束时间 (UTC): {end_date}")
+            print(f"[INFO] URL: https://polymarket.com/event/{slug}")
+            print(f"[DEBUG] Condition ID: {condition_id}")
+            print(f"[DEBUG] Token IDs: {token_ids}")
+
+            return condition_id, token_ids[0], title, slug
+
+        # 如果遍历完都没找到
+        raise ValueError("未找到符合条件的 15分钟 BTC 市场")
 
     except Exception as e:
-        print(f"[WARN] 自动查找失败: {str(e)[:80]}")
+        print(f"[WARN] 查询失败: {str(e)[:80]}")
         import traceback
-        print(f"[DEBUG] 详细错误: {traceback.format_exc()[:300]}")
+        print(f"[DEBUG] 详细错误: {traceback.format_exc()[:500]}")
         return None
 
 
