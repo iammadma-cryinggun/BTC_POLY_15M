@@ -16,11 +16,13 @@
 
 from decimal import Decimal
 import time
+import math
 
 from nautilus_trader.model.enums import OrderSide, TimeInForce
 from nautilus_trader.model.objects import Price, Quantity
 
 from .base_strategy import BaseStrategy
+from .data_recorder import TradeDataRecorder
 
 
 class PredictionMarketMMStrategy(BaseStrategy):
@@ -65,6 +67,7 @@ class PredictionMarketMMStrategy(BaseStrategy):
 
     # 波动率参数
     DEFAULT_MAX_VOLATILITY = Decimal("0.15")
+    DEFAULT_MIN_VOLATILITY = Decimal("0.03")  # 3% 最小波动率底线（防止价差过小）
     DEFAULT_VOLATILITY_WINDOW = 30
 
     # 资金参数
@@ -106,6 +109,7 @@ class PredictionMarketMMStrategy(BaseStrategy):
         self.max_price = getattr(config, 'max_price', self.DEFAULT_MAX_PRICE)
 
         self.max_volatility = getattr(config, 'max_volatility', self.DEFAULT_MAX_VOLATILITY)
+        self.min_volatility = getattr(config, 'min_volatility', self.DEFAULT_MIN_VOLATILITY)
         self.volatility_window = getattr(config, 'volatility_window', self.DEFAULT_VOLATILITY_WINDOW)
 
         self.max_position_ratio = getattr(config, 'max_position_ratio', self.DEFAULT_MAX_POSITION_RATIO)
@@ -121,6 +125,10 @@ class PredictionMarketMMStrategy(BaseStrategy):
         self._daily_start_pnl = Decimal("0")
         self._daily_start_balance = Decimal("0")
         self._market_start_time = None  # 市场开始时间（用于计算T）
+
+        # ========== 数据记录器 ==========
+        self.recorder = TradeDataRecorder()
+        self._recording_enabled = True  # 可开关记录功能
 
     # ========== 核心逻辑 ==========
 
@@ -194,9 +202,53 @@ class PredictionMarketMMStrategy(BaseStrategy):
             f"{'='*60}"
         )
 
+        # ========== 数据记录 ==========
+        if self._recording_enabled:
+            volatility = self._calculate_volatility()
+            self.recorder.record_orderbook(
+                mid_price=mid_price,
+                bid_price=bid_price,
+                ask_price=ask_price,
+                spread=spread,
+                time_remaining_min=time_remaining_min,
+                volatility=volatility,
+                skew=skew,
+            )
+
     def on_order_filled(self, event):
         """订单成交时调用"""
         super().on_order_filled(event)
+
+        # ========== 记录成交数据 ==========
+        if self._recording_enabled:
+            # 计算此交易的盈亏（简化版本：手续费=成本）
+            commission = Decimal(str(event.commission)) if event.commission else Decimal("0")
+            pnl = -commission  # 简化：只扣除手续费
+
+            self.recorder.record_trade(
+                order_id=str(event.order_cl_order_id),
+                side=event.order_side.name,
+                price=Decimal(str(event.last_px)),
+                quantity=event.last_qty,
+                commission=commission,
+                pnl=pnl
+            )
+
+            # 记录库存变化
+            account = self.get_account_info()
+            position = self.get_current_position()
+
+            if account and position:
+                inventory_value = abs(position['quantity']) * Decimal(position['current_price'])
+
+                self.recorder.record_inventory(
+                    inventory_qty=position['quantity'],
+                    inventory_value=inventory_value,
+                    free_balance=account['free_balance'].as_decimal(),
+                    total_balance=account['total_balance'].as_decimal(),
+                    realized_pnl=account['realized_pnl'].as_decimal(),
+                    unrealized_pnl=account['unrealized_pnl'].as_decimal()
+                )
 
         # 检查是否需要对冲
         if self._need_hedge():
@@ -262,10 +314,13 @@ class PredictionMarketMMStrategy(BaseStrategy):
 
     def _calculate_inventory_skew(self) -> Decimal:
         """
-        计算库存倾斜（基于论文的库存风险管理）
+        计算库存倾斜（非线性版本 - 防止爆仓）
 
         持有过多 YES（+）→ 降低买价，提高卖价 → 鼓励卖出
         持有过多 NO（-）→ 提高买价，降低卖价 → 鼓励买入
+
+        改进：使用非线性倾斜，库存越多，倾斜力度呈指数增长
+        公式：skew = sign(delta) * (delta² * factor)
         """
         position = self.get_current_position()
 
@@ -276,8 +331,15 @@ class PredictionMarketMMStrategy(BaseStrategy):
         current_inventory = position['quantity']
         inventory_delta = Decimal(current_inventory) - Decimal(self.target_inventory)
 
-        # 计算倾斜
-        skew = inventory_delta * self.inventory_skew_factor
+        # ========== 非线性倾斜（关键改进）==========
+        # 当 delta=2 时，skew≈0.2%；当 delta=8 时，skew≈3.2%
+        delta_abs = abs(inventory_delta)
+
+        # 使用平方函数，库存越大倾斜力度越强
+        skew_magnitude = (delta_abs ** 2) * self.inventory_skew_factor
+
+        # 保持方向
+        skew = skew_magnitude if inventory_delta > 0 else -skew_magnitude
 
         # 限制最大倾斜
         return max(min(skew, self.max_skew), -self.max_skew)
@@ -317,10 +379,29 @@ class PredictionMarketMMStrategy(BaseStrategy):
         self.submit_order(buy_order)
         self.submit_order(sell_order)
 
+        # ========== 记录订单提交 ==========
+        if self._recording_enabled:
+            self.recorder.record_order(
+                order_id=str(buy_order.client_order_id),
+                side='BUY',
+                price=bid_price,
+                quantity=order_size,
+                order_type='LIMIT',
+                status='SUBMITTED'
+            )
+            self.recorder.record_order(
+                order_id=str(sell_order.client_order_id),
+                side='SELL',
+                price=ask_price,
+                quantity=order_size,
+                order_type='LIMIT',
+                status='SUBMITTED'
+            )
+
     # ========== 计算方法 ==========
 
     def _calculate_volatility(self) -> Decimal:
-        """计算价格波动率"""
+        """计算价格波动率（带最小波动率底线）"""
         if len(self._price_history) < 10:
             return Decimal("0.05")  # 默认5%
 
@@ -332,7 +413,9 @@ class PredictionMarketMMStrategy(BaseStrategy):
         variance = sum((p - mean_price) ** 2 for p in recent_prices) / len(recent_prices)
         volatility = (variance ** 0.5) / mean_price if mean_price > 0 else Decimal("0")
 
-        return volatility
+        # ========== 关键改进：最小波动率底线 ==========
+        # 防止在横盘时价差过小，被变盘埋伏
+        return max(volatility, self.min_volatility)
 
     def _update_price_history(self, price: Decimal):
         """更新价格历史"""
@@ -501,3 +584,62 @@ class PredictionMarketMMStrategy(BaseStrategy):
 
         # 记录市场开始时间
         self._market_start_time = time.time()
+
+        # ========== 保存策略配置 ==========
+        if self._recording_enabled:
+            config_dict = {
+                'instrument_id': str(self.instrument_id),
+                'base_spread': str(self.base_spread),
+                'min_spread': str(self.min_spread),
+                'max_spread': str(self.max_spread),
+                'risk_aversion': str(self.risk_aversion),
+                'time_decay_factor': str(self.time_decay_factor),
+                'order_size': self.order_size,
+                'max_inventory': self.max_inventory,
+                'inventory_skew_factor': str(self.inventory_skew_factor),
+                'max_skew': str(self.max_skew),
+                'min_volatility': str(self.min_volatility),
+                'max_volatility': str(self.max_volatility),
+                'end_buffer_minutes': self.end_buffer_minutes,
+            }
+            self.recorder.save_config(config_dict)
+            self.log.info("[DATA] Strategy configuration saved")
+
+            # 记录初始库存状态
+            account = self.get_account_info()
+            position = self.get_current_position()
+            if account and position:
+                inventory_value = abs(position['quantity']) * Decimal(position['current_price'])
+                self.recorder.record_inventory(
+                    inventory_qty=position['quantity'],
+                    inventory_value=inventory_value,
+                    free_balance=account['free_balance'].as_decimal(),
+                    total_balance=account['total_balance'].as_decimal(),
+                    realized_pnl=account['realized_pnl'].as_decimal(),
+                    unrealized_pnl=account['unrealized_pnl'].as_decimal()
+                )
+
+    def on_stop(self):
+        """策略停止时调用"""
+        super().on_stop()
+
+        # ========== 记录最终库存状态 ==========
+        if self._recording_enabled:
+            account = self.get_account_info()
+            position = self.get_current_position()
+
+            if account and position:
+                inventory_value = abs(position['quantity']) * Decimal(position['current_price'])
+                self.recorder.record_inventory(
+                    inventory_qty=position['quantity'],
+                    inventory_value=inventory_value,
+                    free_balance=account['free_balance'].as_decimal(),
+                    total_balance=account['total_balance'].as_decimal(),
+                    realized_pnl=account['realized_pnl'].as_decimal(),
+                    unrealized_pnl=account['unrealized_pnl'].as_decimal()
+                )
+
+            # 打印数据摘要
+            summary = self.recorder.get_summary()
+            self.log.info(f"\n{summary}")
+            self.log.info("[DATA] Final inventory state recorded")
