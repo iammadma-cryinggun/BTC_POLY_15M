@@ -1,4 +1,4 @@
-nautilus_trader>=1.222.0
+nautilus_trader>=1.221.0
 py_clob_client>=0.34.0
 requests>=2.31.0
 httpx>=0.24.0
