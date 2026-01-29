@@ -22,7 +22,7 @@ sys.path.insert(0, str(project_root))
 
 
 def load_env():
-    """加载私钥"""
+    """加载私钥并推导钱包地址"""
     private_key = os.getenv("POLYMARKET_PK")
     if not private_key:
         env_file = project_root / ".env"
@@ -32,6 +32,18 @@ def load_env():
                     if line.startswith('POLYMARKET_PK='):
                         private_key = line.split('=', 1)[1].strip()
                         break
+
+    # 从私钥推导钱包地址并设置环境变量
+    if private_key:
+        try:
+            from eth_account import Account
+            account = Account.from_key(private_key)
+            address = account.address
+            os.environ['POLYMARKET_FUNDER'] = address
+            print(f"[DEBUG] 钱包地址已推导: {address}")
+        except Exception as e:
+            print(f"[WARN] 无法推导钱包地址: {e}")
+
     return private_key
 
 
