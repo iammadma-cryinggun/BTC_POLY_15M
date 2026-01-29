@@ -210,7 +210,7 @@ def main():
     # 创建数据客户端配置
     data_client_config = PolymarketDataClientConfig(
         private_key=private_key,
-        signature_type=0,
+        signature_type=2,  # 邮箱/Magic 用户使用 type 2
         instrument_provider=InstrumentProviderConfig(
             load_ids=frozenset([str(instrument_id)])
         ),
@@ -219,7 +219,7 @@ def main():
     # 创建执行客户端配置
     exec_client_config = PolymarketExecClientConfig(
         private_key=private_key,
-        signature_type=0,
+        signature_type=2,  # 邮箱/Magic 用户使用 type 2
     )
 
     # 创建日志配置
