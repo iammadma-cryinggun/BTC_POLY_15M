@@ -36,7 +36,13 @@ class BaseStrategy(Strategy):
         self.log.info("=" * 80)
 
         # 获取 Instrument
-        self.instrument = self.cache.instrument(self.instrument_id)
+        # 注意：instrument_id 可能是字符串，需要转换为 InstrumentId 对象
+        if isinstance(self.instrument_id, str):
+            instrument_id_obj = InstrumentId.from_str(self.instrument_id)
+        else:
+            instrument_id_obj = self.instrument_id
+
+        self.instrument = self.cache.instrument(instrument_id_obj)
 
         if not self.instrument:
             self.log.error(f"Instrument not found: {self.instrument_id}")
