@@ -42,16 +42,19 @@ def generate_api_credentials(private_key: str):
 
         # Polymarket API URL
         POLYMARKET_API_URL = "https://clob.polymarket.com"
+        POLYMARKET_CHAIN_ID = 137  # Polygon chain ID
 
         print(f"[DEBUG] 创建 ClobClient...")
         print(f"[DEBUG] API URL: {POLYMARKET_API_URL}")
+        print(f"[DEBUG] Chain ID: {POLYMARKET_CHAIN_ID}")
         print(f"[DEBUG] Private key: {private_key[:10]}...{private_key[-6:]}")
 
-        # 创建客户端
+        # 创建客户端（需要 chain_id）
         client = ClobClient(
             POLYMARKET_API_URL,
             key=str(private_key),
             signature_type=2,  # Magic Wallet
+            chain_id=POLYMARKET_CHAIN_ID,  # Polygon chain ID
         )
 
         print(f"[DEBUG] 调用 create_or_derive_api_creds...")
