@@ -125,12 +125,12 @@ def get_market_info(slug: str):
 def get_latest_15m_btc_market():
     """自动查找最新的15分钟BTC市场"""
     try:
-        # 搜索所有包含 "btc" 和 "15m" 的市场
+        # 直接使用你提供的 slug 格式搜索
         url = "https://gamma-api.polymarket.com/markets"
         params = {
-            "query": "bitcoin 15min",  # 更精确的搜索词
-            "limit": 50,
-            "closing_status": "open",  # 只查未关闭的市场
+            "query": "btc updown",  # 搜索 BTC 涨跌市场
+            "limit": 100,
+            "closing_status": "open",
         }
 
         response = requests.get(url, params=params, timeout=10)
@@ -139,23 +139,30 @@ def get_latest_15m_btc_market():
         markets = response.json()
 
         if not markets:
-            raise ValueError("未找到15分钟BTC市场")
+            raise ValueError("未找到BTC市场")
 
-        # 过滤：question 必须包含 "BTC" 和 "15" 或 "15min"
+        # 过滤：slug 必须包含 "btc-updown-15m" 格式
         filtered_markets = []
         for m in markets:
-            question = m.get('question', '').lower()
             slug = m.get('slug', '').lower()
-            # 检查是否是 BTC 15分钟市场
-            if 'btc' in question or 'bitcoin' in question:
-                if '15' in question or '15min' in slug:
-                    filtered_markets.append(m)
+            question = m.get('question', '').lower()
+            # 只选择 slug 包含 "btc-updown-15m" 的市场
+            if 'btc-updown-15m-' in slug:
+                filtered_markets.append(m)
 
         if not filtered_markets:
-            print(f"[WARN] 搜索到 {len(markets)} 个市场，但没有符合条件的 BTC 15分钟市场")
-            print(f"[DEBUG] 前3个市场:")
-            for i, m in enumerate(markets[:3]):
-                print(f"  {i+1}. {m.get('question', 'N/A')[:60]}...")
+            print(f"[WARN] 搜索到 {len(markets)} 个市场，但没有找到 btc-updown-15m 格式的市场")
+            print(f"[DEBUG] 显示包含 'btc' 的市场:")
+            count = 0
+            for m in markets:
+                slug = m.get('slug', '').lower()
+                question = m.get('question', '')
+                if 'btc' in slug:
+                    count += 1
+                    print(f"  {count}. {slug}")
+                    print(f"     Question: {question[:60]}...")
+                    if count >= 5:
+                        break
             raise ValueError("未找到符合条件的15分钟BTC市场")
 
         # 按开始时间排序，取最新的
