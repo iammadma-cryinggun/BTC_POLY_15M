@@ -124,57 +124,39 @@ def get_market_info(slug: str):
 
 def get_latest_15m_btc_market():
     """自动查找最新的15分钟BTC市场"""
+    import time
     try:
-        # 搜索标题以 "Bitcoin Up or Down" 开头的市场
-        url = "https://gamma-api.polymarket.com/markets"
-        params = {
-            "query": "Bitcoin Up or Down",  # 搜索前端标题
-            "limit": 50,
-            "closing_status": "open",
-        }
+        # 根据当前时间计算 15分钟市场的时间戳
+        # Polymarket 使用美东时间 (ET)，UTC-5 (或 UTC-4 夏令时)
+        # 15分钟市场从 9:30 AM ET 开始，每15分钟一轮
+        current_time = int(time.time())
 
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
+        # 尝试当前和之前的几个 15分钟时间窗口
+        # 每个 15分钟 = 900 秒
+        attempts = []
+        for offset in range(0, 4):  # 尝试最近4个时间窗口
+            # 向下取整到最近的15分钟
+            timestamp = ((current_time - offset * 900) // 900) * 900
+            attempts.append(timestamp)
 
-        markets = response.json()
+        print(f"[INFO] 尝试以下时间戳（按新到旧）: {attempts}")
 
-        if not markets:
-            raise ValueError("未找到BTC市场")
+        for timestamp in attempts:
+            slug = f"btc-updown-15m-{timestamp}"
+            print(f"[INFO] 尝试获取市场: {slug}")
 
-        # 过滤：question 必须以 "Bitcoin Up or Down" 开头（不区分大小写）
-        filtered_markets = []
-        for m in markets:
-            question = m.get('question', '')
-            # 匹配 "Bitcoin Up or Down" 开头
-            if question.strip().startswith('Bitcoin Up or Down'):
-                filtered_markets.append(m)
+            market_info = get_market_info(slug)
+            if market_info:
+                condition_id, token_id, question = market_info
+                print(f"[OK] 成功找到市场!")
+                print(f"[INFO] URL: https://polymarket.com/event/{slug}")
+                print(f"[INFO] Question: {question[:80]}...")
+                return condition_id, token_id, question, slug
 
-        if not filtered_markets:
-            print(f"[WARN] 搜索到 {len(markets)} 个市场，但没有找到以 'Bitcoin Up or Down' 开头的市场")
-            print(f"[DEBUG] 显示前10个市场的 question:")
-            for i, m in enumerate(markets[:10]):
-                question = m.get('question', 'N/A')
-                print(f"  {i+1}. {question[:100]}")
-            raise ValueError("未找到符合条件的15分钟BTC市场")
-
-        # 按开始时间排序，取最新的
-        filtered_markets.sort(key=lambda m: m.get('startTime', 0), reverse=True)
-        latest_market = filtered_markets[0]
-
-        slug = latest_market.get('slug', '')
-        condition_id = latest_market.get('conditionId')
-        token_ids = json.loads(latest_market.get('clobTokenIds', '[]'))
-        token_id = token_ids[0] if token_ids else None
-        question = latest_market.get('question', 'BTC 15m Market')
-
-        if not all([condition_id, token_id, slug]):
-            raise ValueError("市场信息不完整")
-
-        print(f"[OK] 找到最新市场: {slug}")
-        print(f"[INFO] URL: https://polymarket.com/event/{slug}")
-        print(f"[INFO] Question: {question[:80]}...")
-
-        return condition_id, token_id, question, slug
+        # 所有尝试都失败
+        print(f"[ERROR] 尝试了 {len(attempts)} 个时间窗口，都未找到有效市场")
+        print(f"[INFO] 最后尝试的时间戳: {attempts[-1]}")
+        raise ValueError("未找到符合条件的15分钟BTC市场")
 
     except Exception as e:
         print(f"[WARN] 自动查找失败: {str(e)[:80]}")
