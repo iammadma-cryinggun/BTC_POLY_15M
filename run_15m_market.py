@@ -38,8 +38,10 @@ def load_env():
 def generate_api_credentials(private_key: str):
     """生成 API 凭证并设置环境变量"""
     try:
-        from py_clob_client.constants import POLYMARKET_API_URL
         from py_clob_client.client import ClobClient
+
+        # Polymarket API URL
+        POLYMARKET_API_URL = "https://clob.polymarket.com"
 
         # 创建客户端
         client = ClobClient(
