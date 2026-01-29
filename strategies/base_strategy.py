@@ -35,14 +35,14 @@ class BaseStrategy(Strategy):
         self.log.info(f"策略启动: {self.id}")
         self.log.info("=" * 80)
 
-        # 获取 Instrument
-        # 注意：instrument_id 可能是字符串，需要转换为 InstrumentId 对象
+        # 【关键】在开始时就转换好 instrument_id 为对象
+        # 这样整个策略里都可以直接使用，不用重复转换
         if isinstance(self.instrument_id, str):
-            instrument_id_obj = InstrumentId.from_str(self.instrument_id)
-        else:
-            instrument_id_obj = self.instrument_id
+            self.instrument_id = InstrumentId.from_str(self.instrument_id)
+            self.log.info(f"Converted instrument_id to object: {self.instrument_id}")
 
-        self.instrument = self.cache.instrument(instrument_id_obj)
+        # 获取 Instrument
+        self.instrument = self.cache.instrument(self.instrument_id)
 
         if not self.instrument:
             self.log.error(f"Instrument not found: {self.instrument_id}")
