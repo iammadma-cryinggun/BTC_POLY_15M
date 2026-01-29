@@ -123,7 +123,7 @@ def get_market_info(slug: str):
 
 
 def get_latest_15m_btc_market():
-    """使用时间差逻辑查找最新的 15分钟 BTC 市场"""
+    """使用时间差逻辑查找最新的 15分钟 BTC 市场（健壮版）"""
     from datetime import datetime, timezone, timedelta
     import dateutil.parser
 
@@ -133,10 +133,13 @@ def get_latest_15m_btc_market():
         params = {
             "closed": "false",      # 只看活跃市场
             "tags": "Bitcoin",      # 标签过滤
-            "limit": 50,            # 扩大搜索范围
+            "limit": 20,            # 获取最近的市场
             "order": "endDate:asc"  # 按结束时间升序排列
         }
 
+        # 打印容器当前时间，检查时间漂移
+        now = datetime.now(timezone.utc)
+        print(f"[SYSTEM] 容器当前时间 (UTC): {now.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"[INFO] 查询 Gamma API events...")
 
         response = requests.get(url, params=params, timeout=10)
@@ -144,64 +147,105 @@ def get_latest_15m_btc_market():
         events = response.json()
 
         if not events:
-            raise ValueError("未找到活跃的 BTC 市场")
+            print("[WARN] API 返回空列表，可能是网络问题或API维护")
+            return None
 
-        print(f"[OK] 找到 {len(events)} 个活跃 BTC 市场，正在筛选...")
+        print(f"[OK] 找到 {len(events)} 个活跃 BTC 市场")
 
-        # 定义时间窗口 (5分钟后 到 25分钟内)
-        MIN_SECONDS = 300   # 5 分钟
-        MAX_SECONDS = 1500  # 25 分钟
+        # 放宽时间窗口：1分钟 到 60分钟（避免市场真空期崩溃）
+        MIN_SECONDS = 60     # 1 分钟
+        MAX_SECONDS = 3600   # 60 分钟
 
-        now = datetime.now(timezone.utc)
+        print(f"[INFO] 时间窗口: {MIN_SECONDS/60:.0f}-{MAX_SECONDS/60:.0f} 分钟")
+        print(f"[DEBUG] 正在分析最近的 5 个市场:")
+
         candidates = []
 
-        # 遍历所有市场
-        for event in events:
-            title = event.get('title', '')
+        # 遍历所有市场，详细打印前5个
+        for i, event in enumerate(events[:5]):
+            title = event.get('title', 'No Title')
             end_date_str = event.get('endDate')
 
             if not end_date_str:
                 continue
 
             end_date = dateutil.parser.isoparse(end_date_str)
+            diff_seconds = (end_date - now).total_seconds()
+            diff_minutes = diff_seconds / 60
 
-            # 计算时间差 (秒)
-            time_diff = (end_date - now).total_seconds()
+            print(f"  {i+1}. {title[:60]}")
+            print(f"     -> 结束时间: {end_date.strftime('%H:%M:%S')} | 剩余: {diff_minutes:.2f} 分钟")
 
-            # Debug: 打印前几个市场的时间
-            if len(candidates) < 5 and time_diff > 0:
-                print(f"  [DEBUG] {title[:60]} | 剩余: {int(time_diff/60)}min")
-
-            # 核心筛选：时间在 5-25 分钟窗口内
-            if "Bitcoin" in title and MIN_SECONDS < time_diff < MAX_SECONDS:
+            # 筛选逻辑：必须是 Bitcoin 且 在时间窗口内
+            if "Bitcoin" in title and MIN_SECONDS < diff_seconds < MAX_SECONDS:
                 candidates.append({
                     "title": title,
-                    "diff": time_diff,
+                    "diff": diff_seconds,
                     "event": event
                 })
 
+        # 如果没有找到符合窗口的市场，打印所有市场信息
         if not candidates:
-            # 打印最近的市场信息，方便调试
-            if len(events) > 0:
-                first_event = events[0]
-                first_end = dateutil.parser.isoparse(first_event.get('endDate'))
-                diff = (first_end - now).total_seconds()
-                print(f"[DEBUG] 最近的 BTC 市场: {first_event.get('title')[:60]}")
-                print(f"[DEBUG] 距结束: {int(diff/60)} 分钟")
+            print(f"\n[WARN] ⚠️ 未找到符合时间窗口 ({MIN_SECONDS/60:.0f}-{MAX_SECONDS/60:.0f}分钟) 的市场")
+            print(f"[DEBUG] 正在打印所有返回的市场信息:")
 
-            raise ValueError(f"未找到符合时间窗口 (5-25分钟) 的 BTC 市场")
+            all_valid = []
+            for event in events:
+                title = event.get('title', '')
+                end_date_str = event.get('endDate')
+                if not end_date_str:
+                    continue
+
+                end_date = dateutil.parser.isoparse(end_date_str)
+                diff_seconds = (end_date - now).total_seconds()
+
+                # 收集所有未来的 Bitcoin 市场
+                if "Bitcoin" in title and diff_seconds > 0:
+                    all_valid.append({
+                        "title": title,
+                        "diff": diff_seconds,
+                        "event": event
+                    })
+
+            if not all_valid:
+                print("[ERROR] 没有任何未来的 Bitcoin 市场，所有市场都已过期")
+                return None
+
+            # 找到最近的一个（即使是短于1分钟的）
+            best = all_valid[0]
+            print(f"\n[INFO] 最近的有效市场:")
+            print(f"  标题: {best['title']}")
+            print(f"  剩余时间: {best['diff']/60:.2f} 分钟")
+
+            # 如果剩余时间太短，给出警告
+            if best['diff'] < 60:
+                print("[WARN] ⚠️ 该市场将在 1 分钟内结束，属于超短线！")
+                print("[WARN] 建议等待下一个市场")
+                return None
+
+            candidates.append(best)
 
         # 选择最佳市场（列表第一个是最早结束的）
         best_match = candidates[0]
+        minutes_left = best_match['diff'] / 60
 
         print(f"\n[OK] ✅ 锁定市场!")
         print(f"[INFO] 标题: {best_match['title']}")
-        print(f"[INFO] 剩余时间: {int(best_match['diff']/60)} 分钟")
+        print(f"[INFO] 剩余时间: {minutes_left:.2f} 分钟")
+
+        # 智能判断市场类型
+        if minutes_left < 5:
+            print("[WARN] ⚠️ 注意：该市场将在 5 分钟内结束，属于超短线！")
+        elif minutes_left > 30:
+            print("[WARN] ⚠️ 注意：这是一个长周期市场 (>30分钟)")
+        else:
+            print("[INFO] ✅ 这是一个标准的短周期市场 (5-30分钟)")
 
         # 提取市场信息
         markets = best_match['event'].get('markets', [])
         if not markets:
-            raise ValueError("Event 中没有市场数据")
+            print("[ERROR] Event 中没有市场数据")
+            return None
 
         market = markets[0]
         condition_id = market.get('conditionId')
@@ -210,7 +254,8 @@ def get_latest_15m_btc_market():
         slug = market.get('slug', '')
 
         if not all([condition_id, token_ids]):
-            raise ValueError("市场信息不完整")
+            print("[ERROR] 市场信息不完整")
+            return None
 
         print(f"[INFO] URL: https://polymarket.com/event/{slug}")
         print(f"[DEBUG] Condition ID: {condition_id}")
@@ -219,9 +264,9 @@ def get_latest_15m_btc_market():
         return condition_id, token_ids[0], best_match['title'], slug
 
     except Exception as e:
-        print(f"[WARN] 查询失败: {str(e)[:80]}")
+        print(f"[FATAL] 查询失败: {str(e)}")
         import traceback
-        print(f"[DEBUG] 详细错误: {traceback.format_exc()[:500]}")
+        print(f"[DEBUG] 详细错误: {traceback.format_exc()[:800]}")
         return None
 
 
@@ -247,22 +292,41 @@ def main():
         print("\n[ERROR] API 凭证获取失败，程序退出")
         return 1
 
-    # 3. 获取市场信息（自动查找最新的15分钟市场）
+    # 3. 获取市场信息（带重试机制）
     print("\n[INFO] 自动查找最新的15分钟BTC市场...")
 
-    market_info = get_latest_15m_btc_market()
+    import time
+    max_retries = 3
+    market_info = None
 
-    if market_info:
-        condition_id, token_id, question, slug = market_info
-        print(f"[OK] 成功获取市场信息")
-        print(f"    Question: {question[:80]}...")
-        print(f"[DEBUG] condition_id: {condition_id}")
-        print(f"[DEBUG] token_id: {token_id}")
-        print(f"[DEBUG] slug: {slug}")
-    else:
-        print("\n[ERROR] 无法找到15分钟BTC市场")
-        print("[INFO] 请稍后重试，或者检查 Polymarket 是否有15分钟BTC市场")
-        return 1
+    for attempt in range(max_retries):
+        print(f"\n>>> 尝试第 {attempt + 1}/{max_retries} 次市场查找...")
+
+        market_info = get_latest_15m_btc_market()
+
+        if market_info:
+            print(f"\n>>> ✅ 成功获取市场信息")
+            break
+        else:
+            if attempt < max_retries - 1:
+                wait_time = 10
+                print(f">>> ⚠️ 未找到合适市场，等待 {wait_time} 秒后重试...")
+                time.sleep(wait_time)
+            else:
+                print(f"\n[ERROR] 多次尝试后仍无法找到BTC市场")
+                print("[INFO] 可能原因：")
+                print("  1. 市场真空期（15分钟市场交接间隙）")
+                print("  2. API 维护或网络问题")
+                print("  3. 当前时间没有活跃的 BTC 市场")
+                print(f"\n[INFO] 为了便于调试，程序将休眠 60 秒...")
+                time.sleep(60)
+                return 1
+
+    condition_id, token_id, question, slug = market_info
+    print(f"    Question: {question[:80]}...")
+    print(f"[DEBUG] condition_id: {condition_id}")
+    print(f"[DEBUG] token_id: {token_id}")
+    print(f"[DEBUG] slug: {slug}")
 
     # 4. 导入并启动
     print("\n[INFO] 导入 NautilusTrader...")
