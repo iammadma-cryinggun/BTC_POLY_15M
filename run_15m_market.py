@@ -13,7 +13,7 @@ Polymarket 15分钟市场做市策略
 # ========== 版本标记：确认 Zeabur 使用了最新代码 ==========
 print("=" * 60)
 print("[VERSION] Code Version: 2026-01-30-v5-FUNDER-FIX")
-print("[VERSION] Latest Commit: <pending>")
+print("[VERSION] Latest Commit: e04a3c7")
 print("[VERSION] Features: API Key derivation with funder address")
 print("[TEST] If you see this, Zeabur is using the LATEST code!")
 print("=" * 60)
