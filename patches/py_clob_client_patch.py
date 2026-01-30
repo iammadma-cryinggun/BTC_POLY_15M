@@ -69,20 +69,20 @@ def patch_py_clob_client():
         original_get_balance_allowance = client_module.ClobClient.get_balance_allowance
 
         def get_balance_allowance_patched(self, params=None):
-            """修补后的版本：使用 funder 地址查询余额"""
+            """修补后的版本：使用 funder 地址查询余额（但认证仍用 Signer）"""
             self.assert_level_2_auth()
             request_args = client_module.RequestArgs(
                 method="GET",
                 request_path=client_module.GET_BALANCE_ALLOWANCE
             )
 
-            # 修复：如果设置了 funder（proxy 地址），使用它来查询余额
-            funder_address = self.builder.funder if hasattr(self, 'builder') and self.builder else None
+            # 关键修复：HTTP 认证头必须使用 Signer 地址（不能使用 funder）
+            # funder 只用于订单构建和余额查询的 URL 参数
             headers = create_level_2_headers_patched(
                 self.signer,
                 self.creds,
                 request_args,
-                address=funder_address  # ← 传入 funder 地址
+                address=None,  # ← 不传入 funder，使用默认的 signer.address()
             )
 
             if params.signature_type == -1:
@@ -92,12 +92,14 @@ def patch_py_clob_client():
             url = add_balance_allowance_params_to_url(
                 "{}{}".format(self.host, client_module.GET_BALANCE_ALLOWANCE), params
             )
-            return http_get(url, headers=headers)  # ← 使用导入的 http_get 函数
+            return http_get(url, headers=headers)
 
         # 替换原方法
         client_module.ClobClient.get_balance_allowance = get_balance_allowance_patched
 
-        print("[PATCH] py_clob_client 已成功修补 - 余额查询现在使用 funder 地址")
+        print("[PATCH] py_clob_client 已成功修补")
+        print("[INFO] HTTP 认证使用 Signer 地址（API Key 绑定要求）")
+        print("[INFO] funder (Proxy) 地址用于订单构建和余额查询")
 
     except Exception as e:
         print(f"[ERROR] py_clob_client 修补失败: {e}")
