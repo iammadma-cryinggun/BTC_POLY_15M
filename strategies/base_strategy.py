@@ -36,43 +36,91 @@ class BaseStrategy(Strategy):
         self.log.info(f"策略启动: {self.id}")
         self.log.info("=" * 80)
 
-        # 【关键】在开始时就转换好 instrument_id 为对象
-        # 这样整个策略里都可以直接使用，不用重复转换
-        if isinstance(self.instrument_id, str):
-            self.instrument_id = InstrumentId.from_str(self.instrument_id)
-            self.log.info(f"Converted instrument_id to object: {self.instrument_id}")
-
-        # 获取 Instrument
-        self.instrument = self.cache.instrument(self.instrument_id)
-
-        if not self.instrument:
-            self.log.error(f"Instrument not found: {self.instrument_id}")
+        # ========== Step 1: 转换 instrument_id ==========
+        self.log.info("[DEBUG] Step 1: Converting instrument_id...")
+        try:
+            if isinstance(self.instrument_id, str):
+                self.instrument_id = InstrumentId.from_str(self.instrument_id)
+                self.log.info(f"[DEBUG] instrument_id converted: {self.instrument_id}")
+            else:
+                self.log.info(f"[DEBUG] instrument_id already an object: {self.instrument_id}")
+        except Exception as e:
+            self.log.error(f"[ERROR] Failed to convert instrument_id: {e}")
+            import traceback
+            self.log.error(f"[ERROR] Traceback: {traceback.format_exc()[:500]}")
             return
 
-        self.log.info(
-            f"\n"
-            f"交易品种:\n"
-            f"  ID: {self.instrument.id}\n"
-            f"  基础货币: {self.instrument.get_base_currency()}\n"
-            f"  计价货币: {self.instrument.quote_currency}\n"
-            f"  价格精度: {self.instrument.price_precision}\n"
-            f"  数量精度: {self.instrument.size_precision}\n"
-            f"  最小数量: {self.instrument.min_quantity}\n"
-            f"  最大数量: {self.instrument.max_quantity}\n"
-        )
+        # ========== Step 2: 获取 Instrument ==========
+        self.log.info("[DEBUG] Step 2: Getting instrument from cache...")
+        try:
+            self.instrument = self.cache.instrument(self.instrument_id)
 
-        # 订阅数据
-        self.subscribe_data()
+            if not self.instrument:
+                self.log.error(f"[ERROR] Instrument not found: {self.instrument_id}")
+                return
 
-        # 打印初始状态
-        self.print_account_summary()
-        self.print_position_summary()
+            self.log.info(
+                f"\n"
+                f"交易品种:\n"
+                f"  ID: {self.instrument.id}\n"
+                f"  基础货币: {self.instrument.get_base_currency()}\n"
+                f"  计价货币: {self.instrument.quote_currency}\n"
+                f"  价格精度: {self.instrument.price_precision}\n"
+                f"  数量精度: {self.instrument.size_precision}\n"
+                f"  最小数量: {self.instrument.min_quantity}\n"
+                f"  最大数量: {self.instrument.max_quantity}\n"
+            )
+        except Exception as e:
+            self.log.error(f"[ERROR] Failed to get instrument: {e}")
+            import traceback
+            self.log.error(f"[ERROR] Traceback: {traceback.format_exc()[:500]}")
+            return
 
-        # ========== 新增：设置定时器，主动触发策略处理 ==========
-        # 解决 DataClient 丢弃 QuoteTick 导致 on_order_book 不被调用的问题
-        self._timer_thread = None
-        self._stop_timer_flag = False
-        self._start_strategy_timer()
+        # ========== Step 3: 订阅数据 ==========
+        self.log.info("[DEBUG] Step 3: Subscribing to data...")
+        try:
+            self.subscribe_data()
+            self.log.info("[DEBUG] Data subscription complete")
+        except Exception as e:
+            self.log.error(f"[ERROR] Failed to subscribe data: {e}")
+            import traceback
+            self.log.error(f"[ERROR] Traceback: {traceback.format_exc()[:500]}")
+            # Don't return - continue to try timer
+
+        # ========== Step 4: 打印账户摘要 ==========
+        self.log.info("[DEBUG] Step 4: Printing account summary...")
+        try:
+            self.print_account_summary()
+            self.log.info("[DEBUG] Account summary printed")
+        except Exception as e:
+            self.log.warning(f"[WARN] Account summary failed (non-critical): {e}")
+            import traceback
+            self.log.warning(f"[WARN] Traceback: {traceback.format_exc()[:300]}")
+
+        # ========== Step 5: 打印仓位摘要 ==========
+        self.log.info("[DEBUG] Step 5: Printing position summary...")
+        try:
+            self.print_position_summary()
+            self.log.info("[DEBUG] Position summary printed")
+        except Exception as e:
+            self.log.warning(f"[WARN] Position summary failed (non-critical): {e}")
+            import traceback
+            self.log.warning(f"[WARN] Traceback: {traceback.format_exc()[:300]}")
+
+        # ========== Step 6: 启动定时器（关键！）==========
+        self.log.info("[DEBUG] Step 6: Starting strategy timer...")
+        try:
+            self._timer_thread = None
+            self._stop_timer_flag = False
+            self._start_strategy_timer()
+            self.log.info("[DEBUG] Timer initialization complete")
+        except Exception as e:
+            self.log.error(f"[ERROR] Timer startup failed: {e}")
+            import traceback
+            self.log.error(f"[ERROR] Traceback: {traceback.format_exc()[:500]}")
+            # Don't return - log but continue
+
+        self.log.info("[DEBUG] on_start() completed successfully")
 
     def on_stop(self):
         """策略停止时调用"""
@@ -488,20 +536,31 @@ class BaseStrategy(Strategy):
         - 这导致订单簿不更新，on_order_book() 不被调用
         - 解决方案：使用 Python threading.Timer 定时主动查询订单簿
         """
+        self.log.info("[TIMER] _start_strategy_timer() called")
+
         try:
+            self.log.info("[TIMER] Setting _stop_timer_flag = False")
             self._stop_timer_flag = False
+
+            self.log.info("[TIMER] Calling _run_timer_loop()...")
             self._run_timer_loop()
-            self.log.info("[TIMER] 策略定时器已启动 - 将每秒主动检查订单簿")
+
+            self.log.info("[TIMER] ✅ 策略定时器已启动 - 将每秒主动检查订单簿")
         except Exception as e:
-            self.log.warning(f"[TIMER] 定时器启动失败: {e}")
+            self.log.error(f"[TIMER] ❌ 定时器启动失败: {e}")
+            import traceback
+            self.log.error(f"[TIMER] Traceback: {traceback.format_exc()[:500]}")
             self.log.warning("[TIMER] 将依赖被动订单簿更新（可能在僵尸市场中失效）")
 
     def _run_timer_loop(self):
         """
         定时器循环：每秒检查一次订单簿并触发策略逻辑
         """
+        self.log.info("[TIMER] _run_timer_loop() called")
+
         def timer_callback():
             if self._stop_timer_flag:
+                self.log.info("[TIMER] Timer stopped (flag=True)")
                 return  # 停止循环
 
             # 执行策略逻辑
@@ -509,16 +568,32 @@ class BaseStrategy(Strategy):
                 order_book = self.cache.order_book(self.instrument_id)
                 if order_book and hasattr(self, 'on_order_book'):
                     self.on_order_book(order_book)
-            except Exception:
-                pass  # 静默失败
+            except Exception as e:
+                # Only log first few errors to avoid spam
+                if not hasattr(self, '_timer_error_count'):
+                    self._timer_error_count = 0
+                if self._timer_error_count < 5:
+                    self.log.warning(f"[TIMER] Error in timer callback: {e}")
+                    self._timer_error_count += 1
 
             # 重新设置定时器（1秒后）
             if not self._stop_timer_flag:
-                self._timer_thread = threading.Timer(1.0, timer_callback)
-                self._timer_thread.daemon = True  # 设置为守护线程
-                self._timer_thread.start()
+                try:
+                    self._timer_thread = threading.Timer(1.0, timer_callback)
+                    self._timer_thread.daemon = True  # 设置为守护线程
+                    self._timer_thread.start()
+                except Exception as e:
+                    self.log.error(f"[TIMER] Failed to re-arm timer: {e}")
 
         # 启动第一个定时器
-        self._timer_thread = threading.Timer(1.0, timer_callback)
-        self._timer_thread.daemon = True
-        self._timer_thread.start()
+        self.log.info("[TIMER] Creating first timer...")
+        try:
+            self._timer_thread = threading.Timer(1.0, timer_callback)
+            self._timer_thread.daemon = True
+            self._timer_thread.start()
+            self.log.info("[TIMER] ✅ First timer started successfully")
+        except Exception as e:
+            self.log.error(f"[TIMER] ❌ Failed to start first timer: {e}")
+            import traceback
+            self.log.error(f"[TIMER] Traceback: {traceback.format_exc()[:500]}")
+            raise
