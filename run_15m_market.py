@@ -450,6 +450,14 @@ def main():
         from nautilus_trader.model.identifiers import TraderId
         from strategies.prediction_market_mm_strategy import PredictionMarketMMStrategy
 
+        # ========== 关键：在 NautilusTrader 导入后应用补丁 ==========
+        try:
+            from patches import nautilus_skip_balance_check
+            nautilus_skip_balance_check.patch_nautilus_order_validation()
+            print("[OK] NautilusTrader 补丁已应用")
+        except Exception as e:
+            print(f"[WARN] 补丁应用失败: {e}")
+
         # 创建 instrument_id
         instrument_id = get_polymarket_instrument_id(condition_id, token_id)
         print(f"[OK] Instrument ID: {instrument_id}")

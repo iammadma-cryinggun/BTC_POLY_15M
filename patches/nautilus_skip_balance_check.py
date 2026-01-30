@@ -3,7 +3,7 @@
 
 问题：
   - Polymarket API 的 balance-allowance 端点只返回 Signer 的余额（0）
-  - 但实际订单处理时，API 会检查 Funder 的余额（17.75 USDC.e）
+  - 但实际订单处理时，API 会检查 Funder 的余额（实际余额）
   - NautilusTrader 的余额检查会阻止订单创建（NOTIONAL_EXCEEDS_FREE_BALANCE）
 
 解决方案：
@@ -12,8 +12,14 @@
   - 让 Polymarket API 自己处理余额验证（它会检查 Funder 余额）
 """
 
+_PATCHED = False
+
 def patch_nautilus_order_validation():
     """修补 NautilusTrader 以跳过余额预检查"""
+    global _PATCHED
+
+    if _PATCHED:
+        return  # 已经修补过了
 
     try:
         import os
@@ -88,11 +94,17 @@ def patch_nautilus_order_validation():
         print("[INFO] 余额预检查已禁用（Polymarket API 将验证 Funder 余额）")
         print("[WARN] 虚拟余额 1000 USDC.e 仅用于绕过 NautilusTrader 的检查")
 
+        _PATCHED = True
+
+    except ImportError as e:
+        # NautilusTrader 还未导入，延迟修补
+        print(f"[INFO] NautilusTrader 未加载，将在导入后应用补丁")
     except Exception as e:
         print(f"[ERROR] NautilusTrader 补丁失败: {e}")
         import traceback
         traceback.print_exc()
 
 
-# 在模块导入时自动执行修补
+# 尝试立即修补（如果 NautilusTrader 已加载）
 patch_nautilus_order_validation()
+

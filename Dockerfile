@@ -1,5 +1,5 @@
 # 强制重新构建（解决 Zeabur 缓存问题）
-ARG CACHEBUST=20260131-8
+ARG CACHEBUST=20260131-9
 
 FROM python:3.11-slim
 
