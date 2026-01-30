@@ -12,9 +12,10 @@ Polymarket 15分钟市场做市策略
 
 # ========== 版本标记：确认 Zeabur 使用了最新代码 ==========
 print("=" * 60)
-print("[VERSION] Code Version: 2026-01-30-v3")
-print("[VERSION] Latest Commit: 060cf6a")
-print("[VERSION] Features: Proxy address support + Auto API key generation")
+print("[VERSION] Code Version: 2026-01-30-v4-FIX")
+print("[VERSION] Latest Commit: 7a190ed")
+print("[VERSION] Features: .env file loading FIX + Proxy address support")
+print("[TEST] If you see this, Zeabur is using the LATEST code!")
 print("=" * 60)
 
 import os

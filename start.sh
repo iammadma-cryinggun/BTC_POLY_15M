@@ -3,6 +3,8 @@ set -x  # 启用调试模式，打印每个命令
 
 echo "========================================"
 echo "Starting Polymarket Bot"
+echo "Version: 2026-01-30-v4-FIX (Commit: 7a190ed)"
+echo "Features: .env loading FIX + Proxy address support"
 echo "========================================"
 
 # 检查环境变量
@@ -38,6 +40,16 @@ if [ ! -f "/app/run_15m_market.py" ]; then
 fi
 
 echo "[OK] run_15m_market.py found"
+
+# 检查 .env 文件
+echo "[INFO] Checking .env file..."
+if [ -f "/app/.env" ]; then
+    echo "[OK] .env file exists"
+    echo "[INFO] .env file contents (first 10 lines):"
+    head -10 /app/.env
+else
+    echo "[WARN] .env file NOT found!"
+fi
 
 # 启动Python程序（使用unbuffered模式）
 echo "[INFO] Starting Python program..."
