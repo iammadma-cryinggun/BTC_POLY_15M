@@ -139,6 +139,16 @@ def ensure_api_credentials(private_key: str, force_regenerate: bool = False):
 
             print(f"[OK] API 凭证已生成")
             print(f"[DEBUG] API Key: {os.environ['POLYMARKET_API_KEY'][:10]}...")
+            print(f"[DEBUG] API Secret: {os.environ['POLYMARKET_API_SECRET'][:10]}...")
+            print(f"[DEBUG] API Passphrase: {os.environ['POLYMARKET_PASSPHRASE'][:10]}...")
+
+            # 验证环境变量是否正确设置
+            import os as os_check
+            assert os_check.environ['POLYMARKET_API_KEY'] == api_creds.api_key
+            assert os_check.environ['POLYMARKET_API_SECRET'] == api_creds.api_secret
+            assert os_check.environ['POLYMARKET_PASSPHRASE'] == api_creds.api_passphrase
+            print(f"[OK] 环境变量验证通过")
+
             return True
         else:
             print("[ERROR] 无法生成 API 凭证")
@@ -496,10 +506,17 @@ def main():
                     private_key=private_key,
                     signature_type=2,  # Magic Wallet
                     funder=os.getenv('POLYMARKET_FUNDER'),  # 关键：指定 Proxy 地址
+                    # ⭐ 显式传入 API 凭证（而不是依赖环境变量）
+                    api_key=os.environ['POLYMARKET_API_KEY'],
+                    api_secret=os.environ['POLYMARKET_API_SECRET'],
+                    passphrase=os.environ['POLYMARKET_PASSPHRASE'],
                 ),
             },
             logging=LoggingConfig(log_level="WARNING"),  # 减少日志噪音
         )
+
+        print(f"[DEBUG] TradingNode 配置完成")
+        print(f"[DEBUG] API Key in config: {os.environ['POLYMARKET_API_KEY'][:10]}...")
 
         node = TradingNode(config=node_config)
         strategy = PredictionMarketMMStrategy(config)
