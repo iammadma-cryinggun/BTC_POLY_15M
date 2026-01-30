@@ -26,3 +26,6 @@ RUN chmod +x /app/start.sh
 
 # 使用启动脚本（有完整的日志捕获）
 CMD ["/app/start.sh"]
+
+# 备用启动命令：如果 Zeabur 不使用 CMD，可以设置这个
+# 在 Zeabur 的 Start Command 中填入: python /app/simple_test.py
