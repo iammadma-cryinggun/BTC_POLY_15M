@@ -81,22 +81,21 @@ def ensure_api_credentials(private_key: str, force_regenerate: bool = False):
         private_key: 私钥
         force_regenerate: 是否强制重新生成（忽略环境变量）
     """
+    # ⭐ 关键修复：无论什么情况，都强制删除旧的 API 凭证环境变量
+    # 这样可以避免使用 Zeabur 环境变量中的旧凭证
+    if 'POLYMARKET_API_KEY' in os.environ:
+        del os.environ['POLYMARKET_API_KEY']
+        print("[CLEANUP] Removed old POLYMARKET_API_KEY from environment")
+    if 'POLYMARKET_API_SECRET' in os.environ:
+        del os.environ['POLYMARKET_API_SECRET']
+        print("[CLEANUP] Removed old POLYMARKET_API_SECRET from environment")
+    if 'POLYMARKET_PASSPHRASE' in os.environ:
+        del os.environ['POLYMARKET_PASSPHRASE']
+        print("[CLEANUP] Removed old POLYMARKET_PASSPHRASE from environment")
+
     # 检查是否需要强制重新生成
     if force_regenerate:
         print("[INFO] 强制重新生成 API 凭证...")
-    else:
-        # 先检查是否已配置
-        api_key = os.getenv('POLYMARKET_API_KEY')
-        api_secret = os.getenv('POLYMARKET_API_SECRET')
-        passphrase = os.getenv('POLYMARKET_PASSPHRASE')
-
-        if all([api_key, api_secret, passphrase]):
-            print(f"[OK] API 凭证已配置")
-            print(f"[DEBUG] API Key: {api_key[:10]}...")
-            return True
-
-        # 未配置，自动生成
-        print("[INFO] API 凭证未配置，正在自动生成...")
 
     # 自动生成（或强制重新生成）
     try:
