@@ -63,6 +63,9 @@ def patch_py_clob_client():
         headers_module.create_level_2_headers = create_level_2_headers_patched
 
         # ========== 修复 2: 替换 get_balance_allowance 方法 ==========
+        # 导入 HTTP 辅助函数
+        from py_clob_client.http_helpers.helpers import get as http_get
+
         original_get_balance_allowance = client_module.ClobClient.get_balance_allowance
 
         def get_balance_allowance_patched(self, params=None):
@@ -89,7 +92,7 @@ def patch_py_clob_client():
             url = add_balance_allowance_params_to_url(
                 "{}{}".format(self.host, client_module.GET_BALANCE_ALLOWANCE), params
             )
-            return self.get(url, headers=headers)
+            return http_get(url, headers=headers)  # ← 使用导入的 http_get 函数
 
         # 替换原方法
         client_module.ClobClient.get_balance_allowance = get_balance_allowance_patched
