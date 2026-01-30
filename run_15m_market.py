@@ -112,8 +112,16 @@ def ensure_api_credentials(private_key: str, force_regenerate: bool = False):
             chain_id=POLYMARKET_CHAIN_ID,
         )
 
-        print(f"[DEBUG] 调用 create_or_derive_api_creds...")
-        api_creds = client.create_or_derive_api_creds()
+        # ⭐ 关键修复：先删除旧的 API key，然后创建新的
+        print(f"[DEBUG] 删除旧的 API key...")
+        try:
+            client.delete_api_key()
+            print(f"[OK] 旧的 API key 已删除")
+        except Exception as e:
+            print(f"[WARN] 删除旧 API key 失败（可能不存在）: {e}")
+
+        print(f"[DEBUG] 创建新的 API key...")
+        api_creds = client.create_api_key()
 
         if api_creds:
             # ApiCreds 字段名是 api_key, api_secret, api_passphrase（下划线）
