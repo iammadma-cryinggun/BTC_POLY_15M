@@ -45,9 +45,9 @@ def patch_nautilus_order_validation():
 
             重要：实际的余额验证由 Polymarket API 执行（它会检查 Funder 的余额）
             """
-            from nautilus_trader.adapters.polymarket.encoding import usdce_from_units
+            from nautilus_trader.adapters.polymarket.common.conversion import usdce_from_units
             from nautilus_trader.model.objects import AccountBalance, Money
-            from nautilus_trader.adapters.polymarket.common.enums import USDC_POS
+            from nautilus_trader.model.currencies import USDC_POS
             from py_clob_client.clob_types import BalanceAllowanceParams, AssetType
             import asyncio
 
