@@ -503,7 +503,7 @@ def main():
             max_daily_loss: Decimal = Decimal("-3.0")      # 日亏损 -3 USDC
 
             # ========== 行为控制 ==========
-            update_interval_ms: int = 1000    # 1 秒更新
+            update_interval_ms: int = 10000   # 10 秒更新（避免 Cloudflare 速率限制）
             end_buffer_minutes: int = 5       # 最后5分钟停止做市（关键！）
             use_inventory_skew: bool = True
             use_dynamic_spread: bool = True
