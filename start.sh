@@ -3,8 +3,8 @@ set -x  # 启用调试模式，打印每个命令
 
 echo "========================================"
 echo "Starting Polymarket Bot"
-echo "Version: 2026-01-31-v6-ADDRESS-PARAM (Commit: pending)"
-echo "Features: Try URL address parameter for Proxy balance query"
+echo "Version: 2026-01-31-v7-BALANCE-OVERRIDE (Commit: pending)"
+echo "Features: NautilusTrader balance override via env var"
 echo "========================================"
 
 # 检查环境变量
