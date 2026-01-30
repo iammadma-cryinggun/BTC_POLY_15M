@@ -1,0 +1,14 @@
+# Zeabur 配置文件
+version: 2
+
+services:
+  - type: worker
+    name: polymarket-bot
+    env:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PYTHONIOENCODING
+        value: "utf-8"
+    buildCommand: |
+      echo "Building polymarket bot..."
+    startCommand: /app/start.sh
