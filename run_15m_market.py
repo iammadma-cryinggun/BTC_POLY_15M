@@ -40,9 +40,22 @@ def load_env():
             account = Account.from_key(private_key)
             address = account.address
             os.environ['POLYMARKET_FUNDER'] = address
-            print(f"[DEBUG] 钱包地址已推导: {address}")
+            print(f"[DEBUG] Signer address (from private key): {address}")
         except Exception as e:
-            print(f"[WARN] 无法推导钱包地址: {e}")
+            print(f"[WARN] Unable to derive address from private key: {e}")
+
+    # ========== 关键修复：检查是否配置了 Proxy 地址 ==========
+    proxy_address = os.getenv("POLYMARKET_PROXY_ADDRESS")
+    if proxy_address:
+        print(f"[OK] Using Proxy/Deposit address: {proxy_address}")
+        print(f"[INFO] This is the address where your funds are located!")
+        # 如果配置了 Proxy 地址，覆盖 funder
+        os.environ['POLYMARKET_FUNDER'] = proxy_address
+    else:
+        print(f"[WARN] POLYMARKET_PROXY_ADDRESS not configured!")
+        print(f"[WARN] Bot will look for funds at Signer address (might be empty)")
+        print(f"[INFO] If you see 'insufficient balance', add this to .env:")
+        print(f"[INFO]   POLYMARKET_PROXY_ADDRESS=0x18DdcbD977e5b7Ff751A3BAd6F274b67A311CD2d")
 
     return private_key
 
