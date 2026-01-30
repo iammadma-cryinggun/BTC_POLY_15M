@@ -12,9 +12,9 @@ Polymarket 15分钟市场做市策略
 
 # ========== 版本标记：确认 Zeabur 使用了最新代码 ==========
 print("=" * 60)
-print("[VERSION] Code Version: 2026-01-30-v4-FIX")
-print("[VERSION] Latest Commit: 7a190ed")
-print("[VERSION] Features: .env file loading FIX + Proxy address support")
+print("[VERSION] Code Version: 2026-01-30-v5-FUNDER-FIX")
+print("[VERSION] Latest Commit: <pending>")
+print("[VERSION] Features: API Key derivation with funder address")
 print("[TEST] If you see this, Zeabur is using the LATEST code!")
 print("=" * 60)
 
@@ -106,12 +106,16 @@ def ensure_api_credentials(private_key: str, force_regenerate: bool = False):
         POLYMARKET_API_URL = "https://clob.polymarket.com"
         POLYMARKET_CHAIN_ID = 137  # Polygon chain ID
 
-        print(f"[DEBUG] 创建 ClobClient...")
+        # ⭐ 关键修复：推导 API Key 时使用 Proxy 地址！
+        funder_address = os.getenv('POLYMARKET_FUNDER')
+        print(f"[DEBUG] 创建 ClobClient（funder={funder_address}）...")
+
         client = ClobClient(
             POLYMARKET_API_URL,
             key=str(private_key),
             signature_type=2,  # Magic Wallet
             chain_id=POLYMARKET_CHAIN_ID,
+            funder=funder_address,  # ← 关键：传入 funder（Proxy 地址）
         )
 
         # 尝试创建新的 API key（如果失败则使用 derive）
