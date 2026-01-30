@@ -10,6 +10,13 @@ Polymarket 15分钟市场做市策略
 运行: python run_15m_market.py
 """
 
+# ========== 版本标记：确认 Zeabur 使用了最新代码 ==========
+print("=" * 60)
+print("[VERSION] Code Version: 2026-01-30-v3")
+print("[VERSION] Latest Commit: 060cf6a")
+print("[VERSION] Features: Proxy address support + Auto API key generation")
+print("=" * 60)
+
 import os
 import sys
 import json
