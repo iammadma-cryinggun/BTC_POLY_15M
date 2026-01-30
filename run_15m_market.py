@@ -375,10 +375,21 @@ def main():
 
     # 2. 确保 API 凭证存在（在 Zeabur 上强制重新生成，避免环境变量格式问题）
     print("\n[INFO] 检查 API 凭证...")
+    print(f"[DEBUG] 当前环境变量:")
+    print(f"  POLYMARKET_API_KEY: {os.getenv('POLYMARKET_API_KEY', 'NOT SET')[:20] if os.getenv('POLYMARKET_API_KEY') else 'NOT SET'}")
+    print(f"  POLYMARKET_API_SECRET: {os.getenv('POLYMARKET_API_SECRET', 'NOT SET')[:20] if os.getenv('POLYMARKET_API_SECRET') else 'NOT SET'}")
+    print(f"  POLYMARKET_PASSPHRASE: {os.getenv('POLYMARKET_PASSPHRASE', 'NOT SET')[:20] if os.getenv('POLYMARKET_PASSPHRASE') else 'NOT SET'}")
+
     # Zeabur 上强制重新生成，避免环境变量格式问题（比如多余的空格、引号等）
     if not ensure_api_credentials(private_key, force_regenerate=True):
         print("\n[ERROR] API 凭证获取失败，程序退出")
         return 1
+
+    # 验证环境变量已正确设置
+    print(f"[DEBUG] API 凭证生成后的环境变量:")
+    print(f"  POLYMARKET_API_KEY: {os.environ['POLYMARKET_API_KEY'][:20]}...")
+    print(f"  POLYMARKET_API_SECRET: {os.environ['POLYMARKET_API_SECRET'][:20]}...")
+    print(f"  POLYMARKET_PASSPHRASE: {os.environ['POLYMARKET_PASSPHRASE'][:20]}...")
 
     # 3. 获取市场信息（带重试机制）
     print("\n[INFO] 自动查找最新的15分钟BTC市场...")
