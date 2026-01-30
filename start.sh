@@ -3,8 +3,8 @@ set -x  # 启用调试模式，打印每个命令
 
 echo "========================================"
 echo "Starting Polymarket Bot"
-echo "Version: 2026-01-31-v7-BALANCE-OVERRIDE (Commit: pending)"
-echo "Features: NautilusTrader balance override via env var"
+echo "Version: 2026-01-31-v8-AUTO-BALANCE (Commit: pending)"
+echo "Features: Auto-skip NautilusTrader balance check, Polymarket API validates Funder balance"
 echo "========================================"
 
 # 检查环境变量
