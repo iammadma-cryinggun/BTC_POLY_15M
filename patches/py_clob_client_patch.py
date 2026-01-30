@@ -92,6 +92,14 @@ def patch_py_clob_client():
             url = add_balance_allowance_params_to_url(
                 "{}{}".format(self.host, client_module.GET_BALANCE_ALLOWANCE), params
             )
+
+            # ⭐ 新尝试：在 URL 中添加 address 参数，尝试查询 Proxy 地址的余额
+            if self.builder.funder:
+                # 检查 URL 是否已有参数
+                separator = "&" if "?" in url else "?"
+                url = f"{url}{separator}address={self.builder.funder}"
+                print(f"[PATCH DEBUG] 添加 address 参数到 URL: {self.builder.funder}")
+
             return http_get(url, headers=headers)
 
         # 替换原方法

@@ -3,8 +3,8 @@ set -x  # 启用调试模式，打印每个命令
 
 echo "========================================"
 echo "Starting Polymarket Bot"
-echo "Version: 2026-01-30-v4-FIX (Commit: 7a190ed)"
-echo "Features: .env loading FIX + Proxy address support"
+echo "Version: 2026-01-31-v6-ADDRESS-PARAM (Commit: pending)"
+echo "Features: Try URL address parameter for Proxy balance query"
 echo "========================================"
 
 # 检查环境变量
