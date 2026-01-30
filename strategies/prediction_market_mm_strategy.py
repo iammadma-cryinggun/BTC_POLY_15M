@@ -144,12 +144,45 @@ class PredictionMarketMMStrategy(BaseStrategy):
         if not self._check_risk(order_book):
             return
 
-        # 3. 获取中间价
+        # 3. 获取中间价（带冷启动逻辑）
         mid = order_book.midpoint()
-        if not mid:
-            return
 
-        mid_price = Decimal(mid)
+        # ========== 冷启动修复：处理空盘口 ==========
+        if mid is None:
+            # 尝试从 bid/ask 重建中间价
+            best_bid = order_book.best_bid_price()
+            best_ask = order_book.best_ask_price()
+
+            if best_bid is None and best_ask is None:
+                # 情况A：完全空盘 → 使用默认 0.50
+                self.log.warning("[COLD START] 完全空盘口，使用默认中间价 0.50")
+                mid_price = Decimal("0.50")
+
+            elif best_bid is None:
+                # 情况B：只有卖单 → 中间价 = ask - spread
+                ask_price = Decimal(best_ask)
+                mid_price = ask_price * (Decimal("1") - self.base_spread)
+                self.log.warning(f"[COLD START] 只有卖单 {ask_price:.4f}，推算中间价 {mid_price:.4f}")
+
+            elif best_ask is None:
+                # 情况C：只有买单 → 中间价 = bid + spread
+                bid_price = Decimal(best_bid)
+                mid_price = bid_price * (Decimal("1") + self.base_spread)
+                self.log.warning(f"[COLD START] 只有买单 {bid_price:.4f}，推算中间价 {mid_price:.4f}")
+
+            else:
+                # 双方都有但还是 midpoint 返回 None（理论上不会）
+                self.log.warning("[COLD START] midpoint 为 None，尝试直接计算")
+                mid_price = (Decimal(best_bid) + Decimal(best_ask)) / 2
+        else:
+            mid_price = Decimal(mid)
+
+        # ========== 极端价格保护 ==========
+        if mid_price >= Decimal("0.94") or mid_price <= Decimal("0.06"):
+            self.log.warning(
+                f"[RISK] 价格过于极端 {mid_price:.4f}，停止做市以防单边风险"
+            )
+            return
 
         # 4. 记录价格历史
         self._update_price_history(mid_price)
@@ -165,8 +198,17 @@ class PredictionMarketMMStrategy(BaseStrategy):
             return
 
         # 6. 计算时间衰减价差（论文公式：s = γσ²T）
+        # 检测是否为冷启动状态
+        is_cold_start = (mid is None)
+
         if self.use_dynamic_spread:
             spread = self._calculate_time_decay_spread(time_remaining)
+
+            # ========== 冷启动优化：使用更小价差吸引交易 ==========
+            if is_cold_start:
+                # 冷启动时：使用 1/3 价差，更快成交
+                spread = max(spread / 3, self.min_spread)
+                self.log.info(f"[COLD START] 使用激进价差 {spread*100:.2f}% 吸引首笔交易")
         else:
             spread = self.base_spread
 
@@ -189,9 +231,11 @@ class PredictionMarketMMStrategy(BaseStrategy):
 
         # 11. 记录日志
         time_remaining_min = time_remaining / 60
+
         self.log.info(
             f"\n{'='*60}\n"
             f"预测市场做市（基于论文优化）:\n"
+            f"  状态: {'🔥 冷启动' if is_cold_start else '✅ 正常'}\n"
             f"  中间价: {mid_price:.4f}\n"
             f"  剩余时间: {time_remaining_min:.1f} 分钟\n"
             f"  价差: {spread*100:.2f}% (时间衰减调整)\n"
