@@ -388,18 +388,18 @@ def main():
             min_spread: Decimal = Decimal("0.01")   # 1% 最小价差
             max_spread: Decimal = Decimal("0.15")   # 15% 最大价差（时间衰减时可达）
 
-            # ========== 订单设置（小资金起步）==========
-            order_size: int = 2              # 每单 2 个（约 1 USDC @0.50）
-            min_order_size: int = 1          # 最小 1 个（0.5 USDC）
-            max_order_size: int = 5          # 最大 5 个（2.5 USDC）
+            # ========== 订单设置（Polymarket 最小要求）==========
+            order_size: int = 5              # 每单 5 个（约 2.5 USDC @0.50）- 最小交易要求
+            min_order_size: int = 5          # 最小 5 个（2.5 USDC）
+            max_order_size: int = 10         # 最大 10 个（5 USDC）
 
             # ========== 库存设置（严格管理）==========
             target_inventory: int = 0        # 市场中性
-            max_inventory: int = 10          # 最大 10 个（5 USDC）
+            max_inventory: int = 20          # 最大 20 个（10 USDC）
             inventory_skew_factor: Decimal = Decimal("0.001")  # 更敏感（论文建议）
             max_skew: Decimal = Decimal("0.05")
-            hedge_threshold: int = 4        # 持有 4 个就对冲
-            hedge_size: int = 3             # 对冲 3 个
+            hedge_threshold: int = 10        # 持有 10 个就对冲
+            hedge_size: int = 5              # 对冲 5 个
 
             # ========== 价格范围 ==========
             min_price: Decimal = Decimal("0.05")
@@ -471,14 +471,14 @@ def main():
         print("  - 每轮 15 分钟，一天 64 轮")
         print("  - 快速周转，资金利用率高")
         print("  - 随时可以对冲（看订单簿）")
-        print("  - 小订单起步（1U = 2个token）")
+        print("  - Polymarket 最小订单: 5个token（约2.5 USDC）")
         print()
         print("[INFO] 策略配置:")
-        print("  - 每单: 2 个（约 1 USDC）")
-        print("  - 最大库存: 10 个（5 USDC）")
+        print("  - 每单: 5 个（约 2.5 USDC）- 满足最小交易要求")
+        print("  - 最大库存: 20 个（10 USDC）")
         print("  - 基础价差: 2%（动态调整至15%）")
         print("  - 更新频率: 1 秒")
-        print("  - 对冲阈值: 4 个")
+        print("  - 对冲阈值: 10 个")
         print("  - 最后5分钟: 停止做市（保护机制）")
         print()
         print("[INFO] 核心优化:")
@@ -488,10 +488,10 @@ def main():
         print("  ✅ 风险管理: Avellaneda-Stoikov 公式")
         print()
         print("[INFO] 预期收益:")
-        print("  - 每 15 分钟: 0.02-0.10 USDC")
-        print("  - 每小时（4轮）: 0.08-0.40 USDC")
-        print("  - 8 小时: 0.64-3.20 USDC")
-        print("  - 日收益率: 2.1-10.7%")
+        print("  - 每 15 分钟: 0.05-0.25 USDC（每单5个）")
+        print("  - 每小时（4轮）: 0.20-1.00 USDC")
+        print("  - 8 小时: 1.60-8.00 USDC")
+        print("  - 日收益率: 3.2-16%（基于50 USDC资金）")
         print()
         print("[WARN] 这是真实交易模式！")
         print("[WARN] 按 Ctrl+C 停止")
