@@ -1,0 +1,7 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "python /app/run_15m_market.py"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
