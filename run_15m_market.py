@@ -36,15 +36,16 @@ except ImportError as e:
 
 def load_env():
     """加载私钥并推导钱包地址"""
+    # ========== 关键修复：首先加载 .env 文件中的所有环境变量 ==========
+    env_file = project_root / ".env"
+    if env_file.exists():
+        from dotenv import load_dotenv
+        load_dotenv(env_file)
+        print(f"[OK] .env 文件已加载")
+    else:
+        print(f"[WARN] .env 文件不存在")
+
     private_key = os.getenv("POLYMARKET_PK")
-    if not private_key:
-        env_file = project_root / ".env"
-        if env_file.exists():
-            with open(env_file, 'r') as f:
-                for line in f:
-                    if line.startswith('POLYMARKET_PK='):
-                        private_key = line.split('=', 1)[1].strip()
-                        break
 
     # 从私钥推导钱包地址并设置环境变量
     if private_key:
