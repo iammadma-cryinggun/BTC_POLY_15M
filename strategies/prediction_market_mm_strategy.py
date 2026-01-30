@@ -422,9 +422,9 @@ class PredictionMarketMMStrategy(BaseStrategy):
         关键修复：量化价格到 instrument 的价格精度，避免 Decimal 高精度导致错误
         """
         # ========== 量化价格到 instrument 精度 ==========
-        # Polymarket price_precision=3，所以量化到 3 位小数
-        # 避免 "precision greater than max 16, was 28" 错误
-        price_quantization = Decimal("0.001")  # 3位小数
+        # Polymarket price_precision=2，所以量化到 2 位小数（0.01）
+        # 避免 RiskEngine 拒绝：price 0.494 invalid (precision 3 > 2)
+        price_quantization = Decimal("0.01")  # 2位小数
         bid_price_quantized = bid_price.quantize(price_quantization)
         ask_price_quantized = ask_price.quantize(price_quantization)
 
@@ -484,7 +484,10 @@ class PredictionMarketMMStrategy(BaseStrategy):
         # 计算标准差
         mean_price = sum(recent_prices) / len(recent_prices)
         variance = sum((p - mean_price) ** 2 for p in recent_prices) / len(recent_prices)
-        volatility = (variance ** 0.5) / mean_price if mean_price > 0 else Decimal("0")
+
+        # 修复：Decimal ** float 不支持，先转 float 计算平方根，再转回 Decimal
+        std_dev = Decimal(str(float(variance) ** 0.5))
+        volatility = std_dev / mean_price if mean_price > 0 else Decimal("0")
 
         # ========== 关键改进：最小波动率底线 ==========
         # 防止在横盘时价差过小，被变盘埋伏
