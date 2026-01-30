@@ -140,11 +140,8 @@ class PredictionMarketMMStrategy(BaseStrategy):
         if now_ns - self._last_update_time_ns < self.update_interval_ms * 1_000_000:
             return
 
-        # 2. 风险检查
-        if not self._check_risk(order_book):
-            return
-
-        # 3. 获取中间价（带冷启动逻辑）
+        # 2. 获取中间价（带冷启动逻辑）
+        # 注意：必须在风险检查之前，因为冷启动需要处理空盘口
         mid = order_book.midpoint()
 
         # ========== 冷启动修复：处理空盘口 ==========
@@ -202,6 +199,10 @@ class PredictionMarketMMStrategy(BaseStrategy):
             self.log.warning(
                 f"[RISK] 价格过于极端 {mid_price:.4f}，停止做市以防单边风险"
             )
+            return
+
+        # 3. 风险检查（在价格计算之后）
+        if not self._check_risk_with_price(mid_price):
             return
 
         # 4. 记录价格历史
@@ -504,9 +505,18 @@ class PredictionMarketMMStrategy(BaseStrategy):
     # ========== 风险检查 ==========
 
     def _check_risk(self, order_book) -> bool:
-        """综合风险检查"""
+        """综合风险检查（旧版本 - 已废弃，保留以防兼容性问题）"""
+        # 这个方法不再使用，因为我们需要在计算 mid_price 之后再检查
+        return True
+
+    def _check_risk_with_price(self, mid_price: Decimal) -> bool:
+        """
+        综合风险检查（新版本 - 接受已计算的 mid_price）
+
+        这样可以在冷启动处理完成后再进行风险检查
+        """
         checks = [
-            self._check_price_range(order_book),
+            self._check_price_range_with_value(mid_price),
             self._check_volatility_limit(),
             self._check_inventory_limits(),
             self._check_position_limits(),
@@ -516,14 +526,12 @@ class PredictionMarketMMStrategy(BaseStrategy):
         return all(checks)
 
     def _check_price_range(self, order_book) -> bool:
-        """检查价格范围"""
-        mid = order_book.midpoint()
+        """检查价格范围（旧版本 - 已废弃）"""
+        # 这个方法不再使用
+        return True
 
-        if not mid:
-            return False
-
-        mid_price = Decimal(mid)
-
+    def _check_price_range_with_value(self, mid_price: Decimal) -> bool:
+        """检查价格范围（新版本 - 接受 mid_price 参数）"""
         if mid_price < self.min_price or mid_price > self.max_price:
             self.log.warning(
                 f"价格 {mid_price:.4f} 超出范围 "

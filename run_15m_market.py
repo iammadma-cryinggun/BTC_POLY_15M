@@ -419,7 +419,7 @@ def main():
             max_price: Decimal = Decimal("0.95")
 
             # ========== 波动率控制 ==========
-            max_volatility: Decimal = Decimal("0.15")  # 15% 最大波动率
+            max_volatility: Decimal = Decimal("0.50")  # 50% 最大波动率 (Polymarket 二元期权波动大)
             volatility_window: int = 30        # 30 个 tick
 
             # ========== 资金管理 ==========
