@@ -117,6 +117,7 @@ def ensure_api_credentials(private_key: str, force_regenerate: bool = False):
             chain_id=POLYMARKET_CHAIN_ID,
             funder=funder_address,  # ← 关键：传入 funder（Proxy 地址）
         )
+        # 🎭 浏览器伪装头已通过 cloudflare_headers_patch.py 自动注入
 
         # 尝试创建新的 API key（如果失败则使用 derive）
         print(f"[DEBUG] 尝试创建新的 API key...")

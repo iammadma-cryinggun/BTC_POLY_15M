@@ -7,6 +7,9 @@ py_clob_client 补丁模块
 # 导入补丁模块，这会自动执行 patch_py_clob_client() 函数
 from patches import py_clob_client_patch  # noqa: F401
 
+# 导入 Cloudflare Anti-Bot 补丁（浏览器伪装头）
+from patches import cloudflare_headers_patch  # noqa: F401
+
 # 导入 NautilusTrader 余额补丁
 # 选择一个：
 # - nautilus_balance_patch: 使用 POLYMARKET_BALANCE_OVERRIDE 环境变量（需要手动设置）
