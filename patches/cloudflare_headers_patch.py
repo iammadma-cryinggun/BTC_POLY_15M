@@ -1,18 +1,23 @@
 """
-Cloudflare Anti-Bot 补丁 - 为 py_clob_client 添加浏览器伪装头
+Cloudflare Anti-Bot 补丁 - 为 py_clob_client 添加浏览器伪装头和代理支持
 
 问题：
 - Polymarket 使用 Cloudflare 防护
 - py_clob_client 默认的 User-Agent 是 "python-requests/2.x"
 - Cloudflare 检测到后返回 403 Forbidden
+- 本地网络需要代理才能访问
 
 解决方案：
 - 猴子补丁 (Monkey Patch) ClobClient.__init__
 - 自动注入浏览器伪装头（Chrome 120）
+- 自动从环境变量读取代理配置
 """
 
+import os
+
+
 def patch_cloudflare_headers():
-    """为所有 ClobClient 实例添加浏览器伪装头"""
+    """为所有 ClobClient 实例添加浏览器伪装头和代理支持"""
 
     try:
         from py_clob_client import client as client_module
@@ -21,7 +26,7 @@ def patch_cloudflare_headers():
         original_init = client_module.ClobClient.__init__
 
         def new_init(self, host, key=None, **kwargs):
-            """修补后的 __init__：在初始化后自动注入浏览器伪装头"""
+            """修补后的 __init__：在初始化后自动注入浏览器伪装头和代理"""
 
             # 先调用原始的 __init__
             original_init(self, host, key=key, **kwargs)
@@ -43,6 +48,18 @@ def patch_cloudflare_headers():
             # 更新 session.headers
             if hasattr(self, '_session') and hasattr(self._session, 'headers'):
                 self._session.headers.update(fake_headers)
+
+            # ========== 关键：设置代理 ==========
+            http_proxy = os.getenv('HTTP_PROXY') or os.getenv('http_proxy')
+            https_proxy = os.getenv('HTTPS_PROXY') or os.getenv('https_proxy')
+
+            if http_proxy and hasattr(self, '_session'):
+                # 设置代理到 session
+                self._session.proxies = {
+                    'http': http_proxy,
+                    'https': https_proxy or http_proxy,
+                }
+                print(f"[PATCH] 已为 ClobClient 设置代理: {http_proxy}")
 
             print("[PATCH] 已为 ClobClient 注入浏览器伪装头 (Anti-Cloudflare)")
 

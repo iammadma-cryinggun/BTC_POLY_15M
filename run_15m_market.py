@@ -43,6 +43,17 @@ def load_env():
         from dotenv import load_dotenv
         load_dotenv(env_file)
         print(f"[OK] .env 文件已加载")
+
+        # ========== 检查并设置代理 ==========
+        http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
+        https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
+
+        if http_proxy:
+            os.environ['HTTP_PROXY'] = http_proxy
+            os.environ['HTTPS_PROXY'] = https_proxy or http_proxy
+            print(f"[OK] 已设置代理: {http_proxy}")
+        else:
+            print(f"[WARN] 未检测到代理配置")
     else:
         print(f"[WARN] .env 文件不存在")
 
