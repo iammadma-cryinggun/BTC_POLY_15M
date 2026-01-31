@@ -7,6 +7,9 @@ py_clob_client 补丁模块
 # 导入补丁模块，这会自动执行 patch_py_clob_client() 函数
 from patches import py_clob_client_patch  # noqa: F401
 
+# 导入 httpx 代理支持补丁（必须在其他补丁之前导入）
+from patches import httpx_proxy_patch  # noqa: F401
+
 # 导入 Cloudflare Anti-Bot 补丁（浏览器伪装头）
 from patches import cloudflare_headers_patch  # noqa: F401
 
