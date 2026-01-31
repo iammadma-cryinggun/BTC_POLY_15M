@@ -41,37 +41,23 @@ def patch_nautilus_order_validation():
         original_update_account_state = PolymarketExecutionClient._update_account_state
 
         async def _update_account_state_patched(self) -> None:
-            """修补后的版本：使用虚拟余额（1000 USDC.e）以绕过 NautilusTrader 的检查
+            """修补后的版本：直接使用虚拟余额，不调用 API
 
-            重要：实际的余额验证由 Polymarket API 执行（它会检查 Funder 的余额）
+            关键：跳过 API 调用，避免触发 Cloudflare 速率限制
             """
-            from nautilus_trader.adapters.polymarket.common.conversion import usdce_from_units
             from nautilus_trader.model.objects import AccountBalance, Money
             from nautilus_trader.model.currencies import USDC_POS
-            from py_clob_client.clob_types import BalanceAllowanceParams, AssetType
-            import asyncio
 
-            self._log.info("Checking account balance")
+            self._log.info("Checking account balance (using virtual balance, no API call)")
 
-            params = BalanceAllowanceParams(
-                asset_type=AssetType.COLLATERAL,
-                signature_type=self._config.signature_type,
-            )
-            response: dict = await asyncio.to_thread(
-                self._http_client.get_balance_allowance,
-                params,
-            )
-
-            api_balance = int(response.get("balance", 0))
-
-            # ⭐ 关键修复：使用虚拟余额（1000 USDC.e）以绕过 NautilusTrader 的余额检查
-            # 实际的余额验证由 Polymarket API 执行
+            # ⭐ 关键修复：完全不调用 API，直接使用虚拟余额
+            # 这避免了每 30 秒的 API 调用，防止触发 Cloudflare 速率限制
             virtual_balance = 1000.0  # 足够大的值，确保订单不会被 NautilusTrader 拒绝
             total = Money(virtual_balance, USDC_POS)
 
             self._log.warning(
                 f"[PATCH] Proxy 钱包模式：使用虚拟余额 {virtual_balance} USDC.e "
-                f"(API 返回 Signer 余额: {api_balance}, 实际 Funder 余额由 Polymarket API 验证)"
+                f"(API 调用已跳过，避免 Cloudflare 速率限制)"
             )
 
             account_balance = AccountBalance(

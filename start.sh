@@ -3,8 +3,8 @@ set -x  # 启用调试模式，打印每个命令
 
 echo "========================================"
 echo "Starting Polymarket Bot"
-echo "Version: 2026-01-31-v9-CLOUDFLARE-FIX (Commit: pending)"
-echo "Features: 10s update interval to avoid Cloudflare rate limiting"
+echo "Version: 2026-01-31-v10-NO-API-CALL (Commit: pending)"
+echo "Features: Skip balance API calls to avoid Cloudflare rate limiting"
 echo "========================================"
 
 # 检查环境变量
